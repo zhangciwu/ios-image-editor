@@ -13,7 +13,7 @@ static const CGFloat kDefaultCropWidth = 320;
 static const CGFloat kDefaultCropHeight = 320;
 static const CGFloat kBoundingBoxInset = 15;
 static const NSTimeInterval kAnimationIntervalReset = 0.25;
-static const NSTimeInterval kAnimationIntervalTransform = 0.2;
+static const NSTimeInterval kAnimationIntervalTransform = 0.3;
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,11 +36,20 @@ static const NSTimeInterval kAnimationIntervalTransform = 0.2;
 @property(nonatomic, assign) CGRect initialImageFrame;
 @property(nonatomic, assign) CGAffineTransform validTransform;
 
+@property(nonatomic,assign)CGPoint validCenter;
+@property(nonatomic,assign)CGRect validFrame;
+
+@property(nonatomic,strong) UIBezierPath * imageBound;
+
+@property(nonatomic,assign)CGPoint panBegin;
+
 @end
 
 
 
-@implementation HFImageEditorViewController
+@implementation HFImageEditorViewController{
+    CAShapeLayer *_marque;
+}
 
 @dynamic cropBoundsInSourceImage;
 @dynamic cropRect;
@@ -189,6 +198,8 @@ static const NSTimeInterval kAnimationIntervalTransform = 0.2;
     }
     self.initialImageFrame = CGRectMake(CGRectGetMidX(self.cropRect) - w/2, CGRectGetMidY(self.cropRect) - h/2,w,h);
     self.validTransform = CGAffineTransformMakeScale(self.scale, self.scale);
+    self.validCenter=[self centerOfRect:self.initialImageFrame];
+    self.validFrame=self.initialImageFrame;
     
     void (^doReset)(void) = ^{
         self.imageView.transform = CGAffineTransformIdentity;
@@ -245,6 +256,19 @@ static const NSTimeInterval kAnimationIntervalTransform = 0.2;
     tapRecognizer.enabled = self.tapToResetEnabled;
     [self.frameView addGestureRecognizer:tapRecognizer];
     self.tapRecognizer = tapRecognizer;
+    
+    
+    if (!_marque) {
+        _marque = [CAShapeLayer layer] ;
+        _marque.fillColor = [[UIColor clearColor] CGColor];
+        _marque.strokeColor = [[UIColor grayColor] CGColor];
+        _marque.lineWidth = 1.0f;
+        _marque.lineJoin = kCALineJoinRound;
+        _marque.lineDashPattern = [NSArray arrayWithObjects:[NSNumber numberWithInt:10],[NSNumber numberWithInt:5], nil];
+        _marque.bounds = CGRectMake(self.imageView.frame.origin.x, self.imageView.frame.origin.y, 0, 0);
+        _marque.position = CGPointMake(self.view.frame.origin.x , self.view.frame.origin.y );
+    }
+    [[self.view layer] addSublayer:_marque];
 }
 
 
@@ -384,33 +408,34 @@ static const NSTimeInterval kAnimationIntervalTransform = 0.2;
             self.gestureCount--;
             handle = NO;
             if(self.gestureCount == 0) {
-                CGFloat scale = [self boundedScale:self.scale];
-                if(scale != self.scale) {
-                    CGFloat deltaX = self.scaleCenter.x-self.imageView.bounds.size.width/2.0;
-                    CGFloat deltaY = self.scaleCenter.y-self.imageView.bounds.size.height/2.0;
-                    
-                    CGAffineTransform transform =  CGAffineTransformTranslate(self.imageView.transform, deltaX, deltaY);
-                    transform = CGAffineTransformScale(transform, scale/self.scale , scale/self.scale);
-                    transform = CGAffineTransformTranslate(transform, -deltaX, -deltaY);
-                    [self checkBoundsWithTransform:transform];
+//                CGFloat scale = [self boundedScale:self.scale];
+//                if(scale != self.scale) {
+//                    CGFloat deltaX = self.scaleCenter.x-self.imageView.bounds.size.width/2.0;
+//                    CGFloat deltaY = self.scaleCenter.y-self.imageView.bounds.size.height/2.0;
+//                    
+//                    CGAffineTransform transform =  CGAffineTransformTranslate(self.imageView.transform, deltaX, deltaY);
+//                    transform = CGAffineTransformScale(transform, scale/self.scale , scale/self.scale);
+//                    transform = CGAffineTransformTranslate(transform, -deltaX, -deltaY);
+//                    [self checkBoundsWithTransform:transform];
+//                    self.view.userInteractionEnabled = NO;
+//                    [UIView animateWithDuration:kAnimationIntervalTransform delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
+//                        self.imageView.transform = self.validTransform;
+//                    } completion:^(BOOL finished) {
+//                        self.view.userInteractionEnabled = YES;
+//                        self.scale = scale;
+//                    }];
+//                    
+//                } else {
                     self.view.userInteractionEnabled = NO;
                     [UIView animateWithDuration:kAnimationIntervalTransform delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
                         self.imageView.transform = self.validTransform;
-                    } completion:^(BOOL finished) {
-                        self.view.userInteractionEnabled = YES;
-                        self.scale = scale;
-                    }];
-                    
-                } else {
-                    self.view.userInteractionEnabled = NO;
-                    [UIView animateWithDuration:kAnimationIntervalTransform delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
-                        self.imageView.transform = self.validTransform;
+                        [self.view layoutIfNeeded];
                     } completion:^(BOOL finished) {
                         self.view.userInteractionEnabled = YES;
                     }];
 
-                    self.imageView.transform = self.validTransform;
-                }
+                 //   self.imageView.transform = self.validTransform;
+                //}
             }
         } break;
         default:
@@ -419,38 +444,178 @@ static const NSTimeInterval kAnimationIntervalTransform = 0.2;
     return handle;
 }
 
+-(UIBezierPath*)getPathWithInitFrame:(CGRect)initFrame andTransform:(CGAffineTransform)trans andNowCenter:(CGPoint)center{
+    CGPoint points[]={
+        CGPointMake(CGRectGetMinX(initFrame), CGRectGetMinY(initFrame)),
+        CGPointMake(CGRectGetMaxX(initFrame), CGRectGetMinY(initFrame)),
+        CGPointMake(CGRectGetMaxX(initFrame), CGRectGetMaxY(initFrame)),
+        CGPointMake(CGRectGetMinX(initFrame), CGRectGetMaxY(initFrame)),
+    };
+    
+    CGPoint pointsAfter[]={
+        CGPointZero,CGPointZero,CGPointZero,CGPointZero,
+    };
+    
+    int i;
+    CGFloat x=0,y=0;
+    
+    for (i=0; i<4; i++) {
+        pointsAfter[i]=CGPointApplyAffineTransform(points[i], trans);
+        x+=pointsAfter[i].x/4.0;
+        y+=pointsAfter[i].y/4.0;
+    }
+    
+    CGFloat deltaX=center.x-x,deltaY=center.y-y;
+    
+    for (i=0; i<4; i++) {
+        pointsAfter[i].x+=deltaX;
+        pointsAfter[i].y+=deltaY;
+    }
+    
+    UIBezierPath* bezier=[[UIBezierPath alloc] init];
+    
+    for (i=0; i<4; i++) {
+        if (i==0) {
+            [bezier moveToPoint:pointsAfter[i]];
+        }else{
+            [bezier addLineToPoint:pointsAfter[i]];
+        }
+    }
+    
+    [bezier closePath];
+    return bezier;
+    
+}
 
-- (void)checkBoundsWithTransform:(CGAffineTransform)transform
+- (BOOL)checkBoundsWithTransform:(CGAffineTransform)transform andCenter:(CGPoint)imageCenter{
+    NSLog(@"imageView center: %@",NSStringFromCGPoint(imageCenter));
+    NSLog(@"imageView frame: %@",NSStringFromCGRect(self.imageView.frame));
+    
+    
+    self.imageBound=[self getPathWithInitFrame:self.initialImageFrame andTransform:transform andNowCenter:imageCenter];
+    
+    //draw it
+    if (![_marque actionForKey:@"linePhase"]) {
+        CABasicAnimation *dashAnimation;
+        dashAnimation = [CABasicAnimation animationWithKeyPath:@"lineDashPhase"];
+        [dashAnimation setFromValue:[NSNumber numberWithFloat:0.0f]];
+        [dashAnimation setToValue:[NSNumber numberWithFloat:15.0f]];
+        [dashAnimation setDuration:0.5f];
+        [dashAnimation setRepeatCount:HUGE_VALF];
+        [_marque addAnimation:dashAnimation forKey:@"linePhase"];
+    }
+    
+    
+    //CAShapeLayer *shapeView = [[CAShapeLayer alloc] init];
+    //[shapeView setPath:[self imageBound].CGPath];
+    //[[self.view layer] addSublayer:shapeView];
+    
+    [_marque setPath:[self imageBound].CGPath];
+    //CGPathRelease(path);
+    
+    _marque.hidden = NO;
+    
+    
+    if([self.imageBound containsPoint:CGPointMake(CGRectGetMinX(self.cropRect), CGRectGetMinY(self.cropRect))]
+       && [self.imageBound containsPoint:CGPointMake(CGRectGetMaxX(self.cropRect), CGRectGetMinY(self.cropRect))]
+       && [self.imageBound containsPoint:CGPointMake(CGRectGetMinX(self.cropRect), CGRectGetMaxY(self.cropRect))]
+       && [self.imageBound containsPoint:CGPointMake(CGRectGetMaxX(self.cropRect), CGRectGetMaxY(self.cropRect))] ){
+        
+        self.validTransform = transform;
+        self.validCenter=imageCenter;
+        self.validFrame=self.imageView.frame;
+        return YES;
+    }else{
+        return NO;
+    }
+}
+
+
+- (BOOL)checkBoundsWithTransform:(CGAffineTransform)transform
 {
     if(!self.checkBounds) {
         self.validTransform = transform;
-        return;
+        return YES;
     }
-    CGRect r1 = [self boundingBoxForRect:self.cropRect rotatedByRadians:[self imageRotation]];
-    Rectangle r2 = [self applyTransform:transform toRect:self.initialImageFrame];
     
-    CGAffineTransform t = CGAffineTransformMakeTranslation(CGRectGetMidX(self.cropRect), CGRectGetMidY(self.cropRect));
-    t = CGAffineTransformRotate(t, -[self imageRotation]);
-    t = CGAffineTransformTranslate(t, -CGRectGetMidX(self.cropRect), -CGRectGetMidY(self.cropRect));
+    CGPoint imageCenter=CGPointMake(CGRectGetMidX(self.imageView.frame), CGRectGetMidY(self.imageView.frame));
     
-    Rectangle r3 = [self applyTransform:t toRectangle:r2];
+    return [self checkBoundsWithTransform:transform andCenter:imageCenter];
     
-    if(CGRectContainsRect([self CGRectFromRectangle:r3],r1)) {
-        self.validTransform = transform;
-    }
+    
+//    CGRect r1 = [self boundingBoxForRect:self.cropRect rotatedByRadians:[self imageRotation]];
+//    Rectangle r2 = [self applyTransform:transform toRect:self.initialImageFrame];
+//    
+//    CGAffineTransform t = CGAffineTransformMakeTranslation(CGRectGetMidX(self.cropRect), CGRectGetMidY(self.cropRect));
+//    t = CGAffineTransformRotate(t, -[self imageRotation]);
+//    t = CGAffineTransformTranslate(t, -CGRectGetMidX(self.cropRect), -CGRectGetMidY(self.cropRect));
+//    
+//    Rectangle r3 = [self applyTransform:t toRectangle:r2];
+//    
+//    if(CGRectContainsRect([self CGRectFromRectangle:r3],r1)) {
+//        self.validTransform = transform;
+//    }
+}
+
+-(CGPoint )centerOfRect:(CGRect)rect{
+    return CGPointMake(CGRectGetMidX(rect), CGRectGetMidY(rect));
 }
 
 
 
 - (IBAction)handlePan:(UIPanGestureRecognizer*)recognizer
 {
-    if([self handleGestureState:recognizer.state]) {
+    if(recognizer.state == UIGestureRecognizerStateBegan) {
+        self.panBegin=[recognizer locationInView:self.view];
+    }else if(recognizer.state == UIGestureRecognizerStateChanged||recognizer.state==UIGestureRecognizerStateEnded ){
         CGPoint translation = [recognizer translationInView:self.imageView];
         CGAffineTransform transform = CGAffineTransformTranslate( self.imageView.transform, translation.x, translation.y);
         self.imageView.transform = transform;
         [self checkBoundsWithTransform:transform];
 
         [recognizer setTranslation:CGPointMake(0, 0) inView:self.frameView];
+    }
+    
+    
+    if (recognizer.state==UIGestureRecognizerStateEnded || recognizer.state==UIGestureRecognizerStateCancelled){
+        CGPoint endPoint=[recognizer locationInView:self.view];
+        
+        //CALC
+        CGFloat dx=endPoint.x-self.panBegin.x;
+        CGFloat dy=endPoint.y-self.panBegin.y;
+        CGFloat longSide=sqrt(dx*dx+dy*dy);
+        CGFloat deltaXs=dx/longSide;
+        CGFloat deltaYs=dy/longSide;
+        int count=0;
+        CGAffineTransform nowTrans=self.imageView.transform;
+        CGRect nowFrame=self.imageView.frame;
+        CGFloat deltaX=0,deltaY=0;
+        
+        
+//        while (![self checkBoundsWithTransform:self.imageView.transform andCenter:[self centerOfRect:nowFrame]]) {
+//            
+//            deltaX+=deltaXs;
+//            deltaY+=deltaYs;
+//            nowFrame=self.imageView.frame;
+//            nowFrame.origin.x+=deltaX;
+//            nowFrame.origin.y+=deltaY;
+//            
+//        }
+        
+        NSLog(@"centers %@  %@",NSStringFromCGPoint(self.imageView.center),NSStringFromCGPoint(self.validCenter));
+        
+        
+        
+        
+        self.view.userInteractionEnabled = NO;
+        [UIView animateWithDuration:2 delay:0 options:UIViewAnimationOptionCurveEaseOut|UIViewAnimationOptionBeginFromCurrentState|UIViewAnimationOptionLayoutSubviews
+                         animations:^{
+            self.imageView.transform=self.validTransform;
+             //[self.view layoutIfNeeded];
+        } completion:^(BOOL finished) {
+            //self.imageView.transform=self.validTransform;
+            self.view.userInteractionEnabled = YES;
+        }];
     }
 }
 
@@ -500,7 +665,7 @@ static const NSTimeInterval kAnimationIntervalTransform = 0.2;
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
-    return YES;
+    return NO;
 }
 
 

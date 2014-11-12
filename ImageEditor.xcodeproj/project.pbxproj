@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		68499A441A11FA4B009A57BE /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 68499A431A11FA4B009A57BE /* QuartzCore.framework */; };
 		EC23E839167B5C3200314147 /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = EC23E838167B5C3200314147 /* Default-568h@2x.png */; };
 		EC23E850167B600D00314147 /* DemoImageEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = EC23E84F167B600D00314147 /* DemoImageEditor.xib */; };
 		EC23EAED15ECC5610051EA9E /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EC23EAEC15ECC5610051EA9E /* UIKit.framework */; };
@@ -22,6 +23,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		68499A431A11FA4B009A57BE /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		EC23E835167B5B7A00314147 /* HFImageEditorViewController+Private.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "HFImageEditorViewController+Private.h"; sourceTree = "<group>"; };
 		EC23E838167B5C3200314147 /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-568h@2x.png"; sourceTree = "<group>"; };
 		EC23E84F167B600D00314147 /* DemoImageEditor.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; path = DemoImageEditor.xib; sourceTree = "<group>"; };
@@ -49,6 +51,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				68499A441A11FA4B009A57BE /* QuartzCore.framework in Frameworks */,
 				ECFB417115EE162300FA7714 /* AssetsLibrary.framework in Frameworks */,
 				EC23EAED15ECC5610051EA9E /* UIKit.framework in Frameworks */,
 				EC23EAEF15ECC5610051EA9E /* Foundation.framework in Frameworks */,
@@ -82,6 +85,7 @@
 		EC23EAEB15ECC5610051EA9E /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				68499A431A11FA4B009A57BE /* QuartzCore.framework */,
 				ECFB417015EE162200FA7714 /* AssetsLibrary.framework */,
 				EC23EAEC15ECC5610051EA9E /* UIKit.framework */,
 				EC23EAEE15ECC5610051EA9E /* Foundation.framework */,
